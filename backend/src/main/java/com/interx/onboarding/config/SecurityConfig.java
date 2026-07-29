@@ -1,6 +1,8 @@
 package com.interx.onboarding.config;
 
 import com.interx.onboarding.security.JwtAuthFilter;
+import com.interx.onboarding.security.RestAccessDeniedHandler;
+import com.interx.onboarding.security.RestAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,12 +25,18 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter,
+                           RestAuthenticationEntryPoint restAuthenticationEntryPoint,
+                           RestAccessDeniedHandler restAccessDeniedHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.restAuthenticationEntryPoint = restAuthenticationEntryPoint;
+        this.restAccessDeniedHandler = restAccessDeniedHandler;
     }
 
     @Bean
@@ -42,6 +50,13 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // 토큰 없음/만료 -> 401(JSON), 권한 부족(예: 일반 유저의 /api/admin/** 접근) -> 403(JSON).
+            // 기본값(Http403ForbiddenEntryPoint)은 두 경우 모두 바디 없는 403을 반환해서
+            // 프론트엔드의 401 기반 자동 토큰 재발급 인터셉터가 동작하지 않는 문제가 있었다.
+            .exceptionHandling(handling -> handling
+                .authenticationEntryPoint(restAuthenticationEntryPoint)
+                .accessDeniedHandler(restAccessDeniedHandler)
+            )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/h2-console/**", "/actuator/health").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
