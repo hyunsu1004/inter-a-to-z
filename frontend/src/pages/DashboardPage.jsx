@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext.jsx'
-import { useTheme } from '../context/ThemeContext.jsx'
 
 function statusStyle(status) {
   if (status === 'COMPLETED') {
@@ -16,7 +15,6 @@ function statusStyle(status) {
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
-  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -40,46 +38,25 @@ export default function DashboardPage() {
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>안녕하세요</p>
           <p style={{ fontSize: 18, fontWeight: 700, margin: '2px 0 0' }}>{data.name}님</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={toggleTheme}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--border-strong)',
-              borderRadius: 999,
-              width: 38,
-              height: 38,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
-          >
-            <i
-              className={theme === 'dark' ? 'ti ti-sun' : 'ti ti-moon'}
-              style={{ fontSize: 18, color: 'var(--text-secondary)' }}
-            />
-          </button>
-          <button
-            onClick={() => {
-              logout()
-              navigate('/login')
-            }}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--border-strong)',
-              borderRadius: 999,
-              width: 38,
-              height: 38,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            aria-label="로그아웃"
-          >
-            <i className="ti ti-logout" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            logout()
+            navigate('/login')
+          }}
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--border-strong)',
+            borderRadius: 999,
+            width: 38,
+            height: 38,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          aria-label="로그아웃"
+        >
+          <i className="ti ti-logout" style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>

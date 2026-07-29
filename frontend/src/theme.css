@@ -23,32 +23,6 @@
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 
-[data-theme="dark"] {
-  --brand-50: #3A2A16;
-  --brand-100: #4A3419;
-  --brand-200: #6B4A1C;
-  --brand-300: #FF9F1C;
-  --brand-400: #FFB74D;
-  --brand-600: #FFC978;
-  --brand-800: #FFDDB0;
-  --brand-900: #FFF3E0;
-
-  --bg: #1A1512;
-  --surface-1: #23201C;
-  --surface-2: #2B2622;
-  --text-primary: #F5EDE3;
-  --text-secondary: #C9B9A8;
-  --text-muted: #8A7A69;
-  --border: #3A332C;
-  --border-strong: #4A4038;
-  --danger: #F2726F;
-  --success: #55C088;
-}
-
-html, body {
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
 * { box-sizing: border-box; }
 
 html, body, #root {

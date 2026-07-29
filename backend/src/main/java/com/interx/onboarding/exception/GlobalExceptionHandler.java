@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,12 +26,6 @@ public class GlobalExceptionHandler {
         // 로그인 실패는 브루트포스 탐지를 위해 서버 로그에도 남긴다 (자세한 사유는 노출하지 않음)
         log.warn("인증 실패: path={}", request.getDescription(false));
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiError(401, ex.getMessage()));
-    }
-
-    @ExceptionHandler(LockedException.class)
-    public ResponseEntity<ApiError> handleLocked(LockedException ex, WebRequest request) {
-        log.warn("계정 잠금으로 로그인 거부: path={}", request.getDescription(false));
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(new ApiError(429, ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

@@ -15,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
@@ -48,15 +47,12 @@ class AuthServiceTest {
             1209600000L
     );
 
-    // 브루트포스 잠금 로직도 순수 로직이라 실제 인스턴스를 사용한다.
-    private final LoginAttemptService loginAttemptService = new LoginAttemptService();
-
     private AuthService authService;
     private User existingUser;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository, userStatRepository, passwordEncoder, jwtUtil, loginAttemptService);
+        authService = new AuthService(userRepository, userStatRepository, passwordEncoder, jwtUtil);
         existingUser = User.builder()
                 .id(10L)
                 .email("newbie@interx.io")
@@ -149,42 +145,5 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.signup(
                 new SignupRequest("newbie@interx.io", "pw1234!", "누구", null)))
                 .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void login_fiveConsecutiveFailures_locksAccount() {
-        when(userRepository.findByEmail("newbie@interx.io")).thenReturn(Optional.of(existingUser));
-        when(passwordEncoder.matches(any(), any())).thenReturn(false);
-
-        for (int i = 0; i < 5; i++) {
-            assertThatThrownBy(() -> authService.login(new LoginRequest("newbie@interx.io", "wrong")))
-                    .isInstanceOf(BadCredentialsException.class);
-        }
-
-        // 6번째 시도는 비밀번호를 맞게 넣어도 잠금 때문에(비밀번호 검증까지 가지 않고) 거부돼야 한다
-        assertThatThrownBy(() -> authService.login(new LoginRequest("newbie@interx.io", "demo1234!")))
-                .isInstanceOf(LockedException.class);
-    }
-
-    @Test
-    void login_successfulLogin_resetsFailureCount() {
-        when(userRepository.findByEmail("newbie@interx.io")).thenReturn(Optional.of(existingUser));
-        when(passwordEncoder.matches("wrong", "encoded-password")).thenReturn(false);
-        when(passwordEncoder.matches("demo1234!", "encoded-password")).thenReturn(true);
-
-        // 4번 실패 (5번째부터 잠기므로 아직 안전)
-        for (int i = 0; i < 4; i++) {
-            assertThatThrownBy(() -> authService.login(new LoginRequest("newbie@interx.io", "wrong")))
-                    .isInstanceOf(BadCredentialsException.class);
-        }
-        // 성공하면 카운트가 초기화된다
-        assertThat(authService.login(new LoginRequest("newbie@interx.io", "demo1234!")).token()).isNotBlank();
-
-        // 다시 4번 실패해도 (누적 8번이 아니라 리셋 후 4번이므로) 아직 잠기지 않아야 한다
-        for (int i = 0; i < 4; i++) {
-            assertThatThrownBy(() -> authService.login(new LoginRequest("newbie@interx.io", "wrong")))
-                    .isInstanceOf(BadCredentialsException.class);
-        }
-        assertThat(authService.login(new LoginRequest("newbie@interx.io", "demo1234!")).token()).isNotBlank();
     }
 }

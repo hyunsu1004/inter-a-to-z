@@ -14,7 +14,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +28,6 @@ public class AuthService {
     private final UserStatRepository userStatRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final LoginAttemptService loginAttemptService;
 
     @Transactional
     public AuthResponse signup(SignupRequest req) {
@@ -57,27 +55,12 @@ public class AuthService {
         return issueTokens(user);
     }
 
-    /**
-     * 로그인 5회 연속 실패 시 5분간 계정을 잠가 브루트포스 공격을 방지한다.
-     * (LoginAttemptService는 이메일별 실패 횟수를 인메모리로 추적)
-     */
     public AuthResponse login(LoginRequest req) {
-        if (loginAttemptService.isLocked(req.email())) {
-            long seconds = loginAttemptService.remainingLockSeconds(req.email());
-            throw new LockedException(
-                    "로그인 시도가 너무 많아 계정이 잠겼습니다. " + Math.max(seconds / 60, 1) + "분 후 다시 시도해주세요.");
-        }
-
         User user = userRepository.findByEmail(req.email())
-                .orElseThrow(() -> {
-                    loginAttemptService.recordFailure(req.email());
-                    return new BadCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
-                });
+                .orElseThrow(() -> new BadCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다."));
         if (!passwordEncoder.matches(req.password(), user.getPassword())) {
-            loginAttemptService.recordFailure(req.email());
             throw new BadCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
-        loginAttemptService.recordSuccess(req.email());
         return issueTokens(user);
     }
 
