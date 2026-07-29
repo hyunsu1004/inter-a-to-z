@@ -18,6 +18,8 @@ public class MissionService {
     private final MissionRepository missionRepository;
     private final UserMissionRepository userMissionRepository;
     private final GamificationService gamificationService;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public List<MissionDto> listForUser(Long userId) {
         return missionRepository.findAllByOrderByWeekNumberAsc().stream()
@@ -30,7 +32,8 @@ public class MissionService {
                 m.getId(), m.getWeekNumber(), m.getTitle(), m.getDescription(),
                 um == null ? "ASSIGNED" : um.getStatus().name(),
                 um == null ? null : um.getSubmissionText(),
-                um == null ? null : um.getFeedback()
+                um == null ? null : um.getFeedback(),
+                um == null ? null : um.getId()
         );
     }
 
@@ -49,6 +52,8 @@ public class MissionService {
         gamificationService.awardPoints(userId, "MISSION_SUBMIT", missionId, 20);
         gamificationService.checkAndAwardBadges(userId);
 
+        notifySubmission(mission, um);
+
         return toDto(mission, um);
     }
 
@@ -62,6 +67,32 @@ public class MissionService {
         if (approved) {
             gamificationService.awardPoints(um.getUserId(), "MISSION_APPROVED", um.getMissionId(), 10);
         }
+
+        notifyReview(um, approved);
+
         return um;
+    }
+
+    private void notifySubmission(Mission mission, UserMission um) {
+        List<Long> adminIds = userRepository.findAll().stream()
+                .filter(u -> u.getRole() == Role.ADMIN)
+                .map(User::getId)
+                .toList();
+        notificationService.notifyUsers(adminIds, new NotificationEvent(
+                "MISSION_SUBMITTED",
+                "새 미션 제출",
+                "새 제출물이 도착했습니다: '" + mission.getTitle() + "'",
+                mission.getId(), um.getId()
+        ));
+    }
+
+    private void notifyReview(UserMission um, boolean approved) {
+        String title = missionRepository.findById(um.getMissionId()).map(Mission::getTitle).orElse("미션");
+        notificationService.notifyUser(um.getUserId(), new NotificationEvent(
+                approved ? "MISSION_APPROVED" : "MISSION_REJECTED",
+                approved ? "미션이 승인됐어요!" : "미션이 반려됐어요",
+                "'" + title + "' 제출이 " + (approved ? "승인" : "반려") + "되었습니다.",
+                um.getMissionId(), um.getId()
+        ));
     }
 }

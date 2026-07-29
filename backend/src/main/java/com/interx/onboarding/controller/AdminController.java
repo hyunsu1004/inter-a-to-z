@@ -5,12 +5,17 @@ import com.interx.onboarding.domain.Mission;
 import com.interx.onboarding.domain.UserMission;
 import com.interx.onboarding.dto.AdminUserSummaryDto;
 import com.interx.onboarding.dto.FeedbackReplyRequest;
+import com.interx.onboarding.dto.MissionCommentDto;
+import com.interx.onboarding.dto.MissionCommentRequest;
 import com.interx.onboarding.dto.MissionReviewRequest;
 import com.interx.onboarding.repository.FeedbackRepository;
 import com.interx.onboarding.repository.MissionRepository;
 import com.interx.onboarding.repository.UserMissionRepository;
+import com.interx.onboarding.security.CurrentUser;
 import com.interx.onboarding.service.AdminService;
+import com.interx.onboarding.service.MissionCommentService;
 import com.interx.onboarding.service.MissionService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +28,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final MissionService missionService;
+    private final MissionCommentService missionCommentService;
     private final MissionRepository missionRepository;
     private final UserMissionRepository userMissionRepository;
     private final FeedbackRepository feedbackRepository;
@@ -56,6 +62,18 @@ public class AdminController {
     @PostMapping("/missions/submissions/{userMissionId}/review")
     public UserMission review(@PathVariable Long userMissionId, @RequestBody MissionReviewRequest req) {
         return missionService.review(userMissionId, req.approved(), req.feedback());
+    }
+
+    @GetMapping("/missions/submissions/{userMissionId}/comments")
+    public List<MissionCommentDto> comments(@PathVariable Long userMissionId) {
+        return missionCommentService.listForAdmin(userMissionId);
+    }
+
+    @PostMapping("/missions/submissions/{userMissionId}/comments")
+    public MissionCommentDto addComment(@PathVariable Long userMissionId,
+                                         @RequestBody MissionCommentRequest req,
+                                         HttpServletRequest request) {
+        return missionCommentService.addAsAdmin(CurrentUser.id(request), userMissionId, req.content());
     }
 
     @GetMapping("/feedbacks")

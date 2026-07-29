@@ -7,5 +7,6 @@ public record MissionDto(
         String description,
         String status,
         String submissionText,
-        String feedback
+        String feedback,
+        Long userMissionId
 ) {}

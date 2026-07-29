@@ -7,6 +7,7 @@ import MissionsPage from './pages/MissionsPage.jsx'
 import GrowthPage from './pages/GrowthPage.jsx'
 import AdminPage from './pages/AdminPage.jsx'
 import Chatbot from './components/Chatbot.jsx'
+import ToastHost from './components/ToastHost.jsx'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user } = useAuth()
@@ -20,6 +21,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {user && <ToastHost />}
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route

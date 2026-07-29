@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useNotifications } from '../context/NotificationContext.jsx'
+import MissionCommentThread from '../components/MissionCommentThread.jsx'
 
 const TABS = [
   { key: 'users', label: '진행현황' },
@@ -32,7 +34,7 @@ function UsersTab({ users }) {
   )
 }
 
-function SubmissionsTab({ submissions, userMap, missionMap, onReview }) {
+function SubmissionsTab({ submissions, userMap, missionMap, onReview, lastEvent }) {
   const pending = submissions.filter((s) => s.status === 'SUBMITTED')
   const [feedbackDraft, setFeedbackDraft] = useState({})
 
@@ -61,6 +63,7 @@ function SubmissionsTab({ submissions, userMap, missionMap, onReview }) {
               반려
             </button>
           </div>
+          <MissionCommentThread userMissionId={s.id} isAdmin lastEvent={lastEvent} />
         </div>
       ))}
       {pending.length === 0 && <p style={{ color: 'var(--text-muted)' }}>검토 대기 중인 제출이 없어요.</p>}
@@ -111,6 +114,7 @@ function FeedbacksTab({ feedbacks, userMap, onReply }) {
 export default function AdminPage() {
   const { logout } = useAuth()
   const navigate = useNavigate()
+  const { lastEvent } = useNotifications()
   const [tab, setTab] = useState('users')
   const [users, setUsers] = useState([])
   const [submissions, setSubmissions] = useState([])
@@ -125,6 +129,13 @@ export default function AdminPage() {
   }
 
   useEffect(() => { loadAll() }, [])
+
+  // 신입이 새 미션을 제출하면 검토 대기 목록에 실시간으로 반영한다.
+  useEffect(() => {
+    if (lastEvent && lastEvent.type === 'MISSION_SUBMITTED') {
+      loadAll()
+    }
+  }, [lastEvent])
 
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.userId, u.name])), [users])
   const missionMap = useMemo(() => Object.fromEntries(missions.map((m) => [m.id, m.title])), [missions])
@@ -168,7 +179,13 @@ export default function AdminPage() {
 
       {tab === 'users' && <UsersTab users={users} />}
       {tab === 'submissions' && (
-        <SubmissionsTab submissions={submissions} userMap={userMap} missionMap={missionMap} onReview={handleReview} />
+        <SubmissionsTab
+          submissions={submissions}
+          userMap={userMap}
+          missionMap={missionMap}
+          onReview={handleReview}
+          lastEvent={lastEvent}
+        />
       )}
       {tab === 'feedbacks' && <FeedbacksTab feedbacks={feedbacks} userMap={userMap} onReply={handleReply} />}
     </div>

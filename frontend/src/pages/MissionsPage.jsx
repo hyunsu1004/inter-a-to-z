@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
+import { useNotifications } from '../context/NotificationContext.jsx'
+import MissionCommentThread from '../components/MissionCommentThread.jsx'
 
 const STATUS_LABEL = {
   ASSIGNED: '진행 전',
@@ -9,7 +11,7 @@ const STATUS_LABEL = {
   REJECTED: '반려됨',
 }
 
-function MissionCard({ mission, onSubmit }) {
+function MissionCard({ mission, onSubmit, lastEvent }) {
   const [text, setText] = useState(mission.submissionText || '')
   const [submitting, setSubmitting] = useState(false)
   const editable = mission.status === 'ASSIGNED' || mission.status === 'REJECTED'
@@ -56,6 +58,10 @@ function MissionCard({ mission, onSubmit }) {
           )}
         </div>
       )}
+
+      {mission.userMissionId && (
+        <MissionCommentThread userMissionId={mission.userMissionId} lastEvent={lastEvent} />
+      )}
     </div>
   )
 }
@@ -64,12 +70,21 @@ export default function MissionsPage() {
   const navigate = useNavigate()
   const [missions, setMissions] = useState([])
   const [loading, setLoading] = useState(true)
+  const { lastEvent } = useNotifications()
 
   const load = () => {
     apiClient.get('/api/missions').then((res) => setMissions(res.data)).finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [])
+
+  // 사수가 승인/반려하면 화면을 새로고침하지 않아도 상태가 바로 반영되도록 한다.
+  useEffect(() => {
+    if (lastEvent && ['MISSION_APPROVED', 'MISSION_REJECTED'].includes(lastEvent.type)) {
+      load()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastEvent])
 
   const handleSubmit = async (missionId, text) => {
     await apiClient.post(`/api/missions/${missionId}/submit`, { submissionText: text })
@@ -89,7 +104,9 @@ export default function MissionsPage() {
       {loading ? (
         <p>불러오는 중...</p>
       ) : (
-        missions.map((m) => <MissionCard key={m.id} mission={m} onSubmit={handleSubmit} />)
+        missions.map((m) => (
+          <MissionCard key={m.id} mission={m} onSubmit={handleSubmit} lastEvent={lastEvent} />
+        ))
       )}
     </div>
   )
