@@ -21,12 +21,10 @@ public class ChatbotLog {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String answer;
 
     @Column(name = "created_at", nullable = false)
