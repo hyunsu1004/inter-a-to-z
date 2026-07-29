@@ -1,0 +1,113 @@
+:root {
+  --brand-50: #FFF3E0;
+  --brand-100: #FFDDB0;
+  --brand-200: #FFB74D;
+  --brand-300: #FF9F1C;
+  --brand-400: #F2790C;
+  --brand-600: #C25E00;
+  --brand-800: #8A4300;
+  --brand-900: #5C2C00;
+
+  --bg: #FFFBF6;
+  --surface-1: #FFFFFF;
+  --surface-2: #FFF6EC;
+  --text-primary: #23180E;
+  --text-secondary: #6B5B4C;
+  --text-muted: #A6947F;
+  --border: #EEE1D2;
+  --border-strong: #E3CDB0;
+  --danger: #E24B4A;
+  --success: #3B9F6B;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--bg);
+  position: relative;
+  padding-bottom: 32px;
+}
+
+.btn-primary {
+  background: var(--brand-300);
+  color: #FFF7EC;
+  border: none;
+  border-radius: var(--radius);
+  height: 46px;
+  font-size: 15px;
+  font-weight: 600;
+  width: 100%;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  height: 46px;
+  font-size: 14px;
+  font-weight: 500;
+  width: 100%;
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.input {
+  width: 100%;
+  height: 46px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.input:focus {
+  outline: 2px solid var(--brand-300);
+  outline-offset: 1px;
+}
+
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--brand-50);
+  color: var(--brand-800);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
