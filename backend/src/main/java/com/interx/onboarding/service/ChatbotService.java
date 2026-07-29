@@ -4,9 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interx.onboarding.domain.ChatbotLog;
 import com.interx.onboarding.domain.CoreValue;
+import com.interx.onboarding.domain.ProgressStatus;
+import com.interx.onboarding.domain.UserStat;
+import com.interx.onboarding.domain.UserValueProgress;
 import com.interx.onboarding.domain.ValueCard;
 import com.interx.onboarding.repository.ChatbotLogRepository;
 import com.interx.onboarding.repository.CoreValueRepository;
+import com.interx.onboarding.repository.UserStatRepository;
+import com.interx.onboarding.repository.UserValueProgressRepository;
 import com.interx.onboarding.repository.ValueCardRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -18,6 +23,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -26,6 +32,8 @@ public class ChatbotService {
     private final CoreValueRepository coreValueRepository;
     private final ValueCardRepository valueCardRepository;
     private final ChatbotLogRepository chatbotLogRepository;
+    private final UserValueProgressRepository userValueProgressRepository;
+    private final UserStatRepository userStatRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
@@ -37,17 +45,21 @@ public class ChatbotService {
 
     public ChatbotService(CoreValueRepository coreValueRepository,
                            ValueCardRepository valueCardRepository,
-                           ChatbotLogRepository chatbotLogRepository) {
+                           ChatbotLogRepository chatbotLogRepository,
+                           UserValueProgressRepository userValueProgressRepository,
+                           UserStatRepository userStatRepository) {
         this.coreValueRepository = coreValueRepository;
         this.valueCardRepository = valueCardRepository;
         this.chatbotLogRepository = chatbotLogRepository;
+        this.userValueProgressRepository = userValueProgressRepository;
+        this.userStatRepository = userStatRepository;
     }
 
     public String ask(Long userId, String message) {
         String answer;
-        if ("openai".equalsIgnoreCase(provider) && apiKey != null && !apiKey.isBlank()) {
+        if (isOpenAiEnabled()) {
             try {
-                answer = askOpenAi(message);
+                answer = callOpenAi(buildSystemPrompt(), message, 0.6);
             } catch (Exception e) {
                 answer = fallbackAnswer(message);
             }
@@ -61,12 +73,116 @@ public class ChatbotService {
         return answer;
     }
 
-    private String askOpenAi(String message) throws Exception {
-        String systemPrompt = buildSystemPrompt();
+    /**
+     * "물어봐야 답하는" 기존 챗봇과 달리, 사용자가 묻지 않아도 학습 현황(완료/진행중/미시작 핵심가치 수,
+     * 누적 포인트, 연속 학습일)을 근거로 먼저 말을 거는 능동형 코칭 메시지를 생성한다.
+     * OpenAI 모드에서는 이 요약을 프롬프트에 실어 LLM이 코칭 문구를 생성하게 하고,
+     * mock 모드에서는 동일한 요약을 규칙 기반 템플릿에 대입해 개인화된 문구를 만든다.
+     */
+    public String coachingMessage(Long userId) {
+        ProgressSummary summary = buildProgressSummary(userId);
+        if (isOpenAiEnabled()) {
+            try {
+                return callOpenAi(COACHING_SYSTEM_PROMPT, buildCoachingUserPrompt(summary), 0.7);
+            } catch (Exception e) {
+                return mockCoachingMessage(summary);
+            }
+        }
+        return mockCoachingMessage(summary);
+    }
+
+    private boolean isOpenAiEnabled() {
+        return "openai".equalsIgnoreCase(provider) && apiKey != null && !apiKey.isBlank();
+    }
+
+    private static final String COACHING_SYSTEM_PROMPT =
+            "너는 인터엑스 온보딩 포털의 AI 코치야. 신입사원이 묻지 않아도 학습 현황을 보고 먼저 말을 거는 역할이야. "
+                    + "훈계하지 말고 격려와 함께 다음 행동을 1~2문장으로 짧고 친근하게 제안해줘.";
+
+    private String buildCoachingUserPrompt(ProgressSummary s) {
+        return String.format(
+                "완료한 핵심가치 %d개, 진행중 %d개, 미시작 %d개, 누적 포인트 %d점, 연속 학습일 %d일. "
+                        + "다음으로 추천할 미시작 핵심가치: %s",
+                s.completedCount(), s.inProgressCount(), s.notStartedCount(), s.totalPoints(), s.currentStreak(),
+                s.nextRecommendedValueName() == null ? "없음(모두 시작함)" : s.nextRecommendedValueName()
+        );
+    }
+
+    private String mockCoachingMessage(ProgressSummary s) {
+        if (s.completedCount() >= 12) {
+            return pick(
+                    "12개 핵심가치를 모두 완료하셨네요! 정말 대단해요 🎉 이제 미션에서 배운 걸 마음껏 발휘해보세요.",
+                    "핵심가치 올클리어! 다음은 실제 미션에서 배운 내용을 적용해볼 차례예요."
+            );
+        }
+        if (s.completedCount() == 0 && s.inProgressCount() == 0) {
+            return pick(
+                    "아직 핵심가치 학습 전이시네요. '" + s.nextRecommendedValueName() + "'부터 가볍게 시작해보는 건 어때요?",
+                    "첫 핵심가치 학습을 기다리고 있어요! '" + s.nextRecommendedValueName() + "' 카드부터 넘겨보세요."
+            );
+        }
+        if (s.currentStreak() >= 3 && s.nextRecommendedValueName() != null) {
+            return pick(
+                    s.currentStreak() + "일 연속 학습 중이시네요 🔥 이 기세로 '" + s.nextRecommendedValueName() + "'도 끝내볼까요?",
+                    "스트릭 " + s.currentStreak() + "일째! 꾸준함이 최고의 무기예요. 오늘도 한 장 더 넘겨볼까요?"
+            );
+        }
+        if (s.notStartedCount() > 0) {
+            return pick(
+                    "지금까지 " + s.completedCount() + "개 완료하셨어요. 아직 시작 안 한 '" + s.nextRecommendedValueName() + "'도 한 번 살펴보시겠어요?",
+                    s.completedCount() + "개 완료, " + s.notStartedCount() + "개 남았어요. 지금 페이스면 충분히 여유 있어요!"
+            );
+        }
+        return pick(
+                "지금까지 " + s.completedCount() + "개의 핵심가치를 완료하셨어요. 이 페이스를 유지해보세요!",
+                "누적 " + s.totalPoints() + "포인트 모으셨네요. 조금만 더 힘내봐요!"
+        );
+    }
+
+    /** 완료/진행중/미시작 핵심가치 개수와 다음 추천 가치, 누적 포인트·스트릭을 한 번의 조회로 계산한다. */
+    private ProgressSummary buildProgressSummary(Long userId) {
+        List<CoreValue> values = coreValueRepository.findAllByOrderBySortOrderAsc();
+        Map<Long, ProgressStatus> progressMap = userValueProgressRepository.findByUserId(userId).stream()
+                .collect(java.util.stream.Collectors.toMap(UserValueProgress::getCoreValueId, UserValueProgress::getStatus));
+
+        int completed = 0;
+        int inProgress = 0;
+        int notStarted = 0;
+        String nextValue = null;
+        for (CoreValue v : values) {
+            ProgressStatus status = progressMap.getOrDefault(v.getId(), ProgressStatus.NOT_STARTED);
+            if (status == ProgressStatus.COMPLETED) {
+                completed++;
+            } else if (status == ProgressStatus.IN_PROGRESS) {
+                inProgress++;
+            } else {
+                notStarted++;
+                if (nextValue == null) nextValue = v.getName();
+            }
+        }
+
+        UserStat stat = userStatRepository.findById(userId).orElse(null);
+        int totalPoints = stat != null ? stat.getTotalPoints() : 0;
+        int currentStreak = stat != null ? stat.getCurrentStreak() : 0;
+
+        return new ProgressSummary(completed, inProgress, notStarted, totalPoints, currentStreak, nextValue);
+    }
+
+    private record ProgressSummary(
+            int completedCount,
+            int inProgressCount,
+            int notStartedCount,
+            int totalPoints,
+            int currentStreak,
+            String nextRecommendedValueName
+    ) {}
+
+    /** OpenAI Chat Completions 호출 공통 로직. 실패 시 예외를 던져 호출부에서 mock으로 폴백하게 한다. */
+    private String callOpenAi(String systemPrompt, String userMessage, double temperature) throws Exception {
         ChatCompletionRequest payload = new ChatCompletionRequest(
                 "gpt-4o-mini",
-                List.of(new ChatMessage("system", systemPrompt), new ChatMessage("user", message)),
-                0.6
+                List.of(new ChatMessage("system", systemPrompt), new ChatMessage("user", userMessage)),
+                temperature
         );
         String body = objectMapper.writeValueAsString(payload);
 
@@ -80,7 +196,10 @@ public class ChatbotService {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         JsonNode root = objectMapper.readTree(response.body());
         JsonNode content = root.path("choices").path(0).path("message").path("content");
-        return content.isMissingNode() ? fallbackAnswer(message) : content.asText(fallbackAnswer(message));
+        if (content.isMissingNode()) {
+            throw new IllegalStateException("OpenAI 응답에 content가 없습니다.");
+        }
+        return content.asText();
     }
 
     private String buildSystemPrompt() {

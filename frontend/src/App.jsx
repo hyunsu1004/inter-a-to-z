@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import ValueLearningPage from './pages/ValueLearningPage.jsx'
 import MissionsPage from './pages/MissionsPage.jsx'
+import GrowthPage from './pages/GrowthPage.jsx'
 import AdminPage from './pages/AdminPage.jsx'
 import Chatbot from './components/Chatbot.jsx'
 
@@ -42,6 +43,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <MissionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/growth"
+          element={
+            <ProtectedRoute>
+              <GrowthPage />
             </ProtectedRoute>
           }
         />

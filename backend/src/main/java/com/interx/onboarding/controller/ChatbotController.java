@@ -20,4 +20,11 @@ public class ChatbotController {
         String answer = chatbotService.ask(CurrentUser.id(request), req.message());
         return new ChatbotResponse(answer);
     }
+
+    /** 사용자가 묻지 않아도 학습 현황을 근거로 먼저 말을 거는 개인화 코칭 메시지. */
+    @GetMapping("/coaching")
+    public ChatbotResponse coaching(HttpServletRequest request) {
+        String answer = chatbotService.coachingMessage(CurrentUser.id(request));
+        return new ChatbotResponse(answer);
+    }
 }

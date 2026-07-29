@@ -3,9 +3,14 @@ package com.interx.onboarding.service;
 import com.interx.onboarding.domain.CardType;
 import com.interx.onboarding.domain.ChatbotLog;
 import com.interx.onboarding.domain.CoreValue;
+import com.interx.onboarding.domain.ProgressStatus;
+import com.interx.onboarding.domain.UserStat;
+import com.interx.onboarding.domain.UserValueProgress;
 import com.interx.onboarding.domain.ValueCard;
 import com.interx.onboarding.repository.ChatbotLogRepository;
 import com.interx.onboarding.repository.CoreValueRepository;
+import com.interx.onboarding.repository.UserStatRepository;
+import com.interx.onboarding.repository.UserValueProgressRepository;
 import com.interx.onboarding.repository.ValueCardRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,11 +37,16 @@ class ChatbotServiceTest {
     private ValueCardRepository valueCardRepository;
     @Mock
     private ChatbotLogRepository chatbotLogRepository;
+    @Mock
+    private UserValueProgressRepository userValueProgressRepository;
+    @Mock
+    private UserStatRepository userStatRepository;
 
     @InjectMocks
     private ChatbotService chatbotService;
 
     private CoreValue persistence;
+    private CoreValue timeMgmt;
 
     @BeforeEach
     void setUp() {
@@ -48,7 +59,7 @@ class ChatbotServiceTest {
                 .description("실패를 통해 빠르게 배우고 전략을 수정하며 반복적으로 실행합니다.")
                 .sortOrder(3).build();
 
-        CoreValue timeMgmt = CoreValue.builder()
+        timeMgmt = CoreValue.builder()
                 .id(2L).name("초효율적 시간관리").icon("clock")
                 .description("AI 등 다양한 도구와 리소스를 적극 활용하여 업무를 자동화/효율화합니다.")
                 .sortOrder(2).build();
@@ -64,6 +75,10 @@ class ChatbotServiceTest {
 
         lenient().when(chatbotLogRepository.save(any(ChatbotLog.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+
+        // 코칭 관련 기본값: 진행 이력 없음, UserStat 없음 (개별 테스트에서 필요 시 오버라이드)
+        lenient().when(userValueProgressRepository.findByUserId(any())).thenReturn(List.of());
+        lenient().when(userStatRepository.findById(any())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -103,5 +118,53 @@ class ChatbotServiceTest {
         chatbotService.ask(5L, "안녕");
 
         org.mockito.Mockito.verify(chatbotLogRepository).save(any(ChatbotLog.class));
+    }
+
+    @Test
+    void coachingMessage_forUserWithNoProgress_suggestsStartingFirstValue() {
+        // findAllByOrderBySortOrderAsc()는 [timeMgmt(id=2), persistence(id=3)] 순서이므로
+        // 진행 이력이 전혀 없으면 첫 번째인 timeMgmt("초효율적 시간관리")를 추천해야 한다.
+        String message = chatbotService.coachingMessage(1L);
+
+        assertThat(message).isNotBlank();
+        assertThat(message).contains("초효율적 시간관리");
+    }
+
+    @Test
+    void coachingMessage_forUserWithHighStreak_mentionsStreak() {
+        UserValueProgress inProgress = UserValueProgress.builder()
+                .id(1L).userId(1L).coreValueId(2L).status(ProgressStatus.IN_PROGRESS).build();
+        when(userValueProgressRepository.findByUserId(1L)).thenReturn(List.of(inProgress));
+        UserStat stat = UserStat.builder()
+                .userId(1L).currentStreak(5).longestStreak(5).totalPoints(30).build();
+        when(userStatRepository.findById(1L)).thenReturn(Optional.of(stat));
+
+        String message = chatbotService.coachingMessage(1L);
+
+        assertThat(message).contains("5일");
+    }
+
+    @Test
+    void coachingMessage_whenNothingLeftToStart_doesNotRecommendSpecificValue() {
+        UserValueProgress completedTime = UserValueProgress.builder()
+                .id(1L).userId(1L).coreValueId(2L).status(ProgressStatus.COMPLETED).build();
+        UserValueProgress completedPersistence = UserValueProgress.builder()
+                .id(2L).userId(1L).coreValueId(3L).status(ProgressStatus.COMPLETED).build();
+        when(userValueProgressRepository.findByUserId(1L))
+                .thenReturn(List.of(completedTime, completedPersistence));
+
+        String message = chatbotService.coachingMessage(1L);
+
+        assertThat(message).isNotBlank();
+        // 픽스처의 핵심가치 2개를 모두 완료했으므로 미시작 가치가 없다 — 특정 가치 이름을 추천하는 문구는 없어야 한다.
+        assertThat(message).doesNotContain("아직 시작 안 한");
+    }
+
+    @Test
+    void everyCoachingCall_doesNotPersistToChatbotLog() {
+        // 코칭 메시지는 사용자의 질문에 대한 답이 아니라 선제적 제안이므로 채팅 로그에는 남기지 않는다.
+        chatbotService.coachingMessage(1L);
+
+        org.mockito.Mockito.verify(chatbotLogRepository, org.mockito.Mockito.never()).save(any(ChatbotLog.class));
     }
 }

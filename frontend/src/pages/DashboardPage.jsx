@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [coaching, setCoaching] = useState(null)
 
   const load = () => {
     apiClient.get('/api/dashboard').then((res) => setData(res.data)).finally(() => setLoading(false))
@@ -27,6 +28,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     load()
+    // 대시보드 핵심 데이터와 별개로 로드해, 코칭 응답이 느려도 나머지 화면은 바로 뜨게 한다
+    apiClient
+      .get('/api/chatbot/coaching')
+      .then((res) => setCoaching(res.data.answer))
+      .catch(() => setCoaching(null))
   }, [])
 
   if (loading || !data) {
@@ -100,6 +106,26 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {coaching && (
+        <div
+          className="card"
+          style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--surface-2)', border: 'none', marginBottom: 16 }}
+        >
+          <div
+            style={{
+              width: 30, height: 30, borderRadius: 999, background: 'var(--brand-300)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
+          >
+            <i className="ti ti-sparkles" style={{ fontSize: 15, color: '#FFF7EC' }} />
+          </div>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-800)', margin: '2px 0 4px' }}>오늘의 코칭</p>
+            <p style={{ fontSize: 13, margin: 0, lineHeight: 1.5 }}>{coaching}</p>
+          </div>
+        </div>
+      )}
+
       {data.currentMission && (
         <div
           className="card"
@@ -135,14 +161,24 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <button
-        className="btn-secondary"
-        style={{ marginTop: 20 }}
-        onClick={() => navigate('/missions')}
-        type="button"
-      >
-        미션 전체보기
-      </button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+        <button
+          className="btn-secondary"
+          style={{ flex: 1 }}
+          onClick={() => navigate('/missions')}
+          type="button"
+        >
+          미션 전체보기
+        </button>
+        <button
+          className="btn-secondary"
+          style={{ flex: 1 }}
+          onClick={() => navigate('/growth')}
+          type="button"
+        >
+          나의 성장 보기
+        </button>
+      </div>
     </div>
   )
 }
