@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -33,6 +34,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleLocked(LockedException ex, WebRequest request) {
         log.warn("계정 잠금으로 로그인 거부: path={}", request.getDescription(false));
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(new ApiError(429, ex.getMessage()));
+    }
+
+    @ExceptionHandler(InsufficientAuthenticationException.class)
+    public ResponseEntity<ApiError> handleInsufficientAuthentication(InsufficientAuthenticationException ex, WebRequest request) {
+        // 토큰이 없거나 만료/위조된 상태 — 프론트엔드가 401을 감지해 자동으로 리프레시를 시도한다.
+        log.warn("미인증 요청: path={}", request.getDescription(false));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiError(401, ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
