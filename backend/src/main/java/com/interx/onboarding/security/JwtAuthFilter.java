@@ -32,6 +32,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String token = header.substring(7);
             try {
                 Claims claims = jwtUtil.parse(token);
+                // 리프레시 토큰은 API 인증에 쓰일 수 없고 /api/auth/refresh 에서만 사용해야 함
+                if (jwtUtil.isRefreshToken(claims)) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 String email = claims.getSubject();
                 String role = claims.get("role", String.class);
                 Long userId = Long.parseLong(claims.get("userId", String.class));

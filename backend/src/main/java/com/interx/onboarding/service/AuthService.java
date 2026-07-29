@@ -5,10 +5,13 @@ import com.interx.onboarding.domain.User;
 import com.interx.onboarding.domain.UserStat;
 import com.interx.onboarding.dto.AuthResponse;
 import com.interx.onboarding.dto.LoginRequest;
+import com.interx.onboarding.dto.RefreshRequest;
 import com.interx.onboarding.dto.SignupRequest;
 import com.interx.onboarding.repository.UserRepository;
 import com.interx.onboarding.repository.UserStatRepository;
 import com.interx.onboarding.security.JwtUtil;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,8 +52,7 @@ public class AuthService {
                 .build();
         userStatRepository.save(stat);
 
-        String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getId(), user.getName(), user.getEmail(), user.getRole().name());
+        return issueTokens(user);
     }
 
     public AuthResponse login(LoginRequest req) {
@@ -59,7 +61,32 @@ public class AuthService {
         if (!passwordEncoder.matches(req.password(), user.getPassword())) {
             throw new BadCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
+        return issueTokens(user);
+    }
+
+    /**
+     * 액세스 토큰(짧은 만료)이 만료되어도, 리프레시 토큰(긴 만료)이 유효하면 재로그인 없이
+     * 새 액세스 토큰을 발급한다. 리프레시 토큰도 함께 새로 발급(로테이션)해 탈취 위험을 줄인다.
+     */
+    public AuthResponse refresh(RefreshRequest req) {
+        Claims claims;
+        try {
+            claims = jwtUtil.parse(req.refreshToken());
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new BadCredentialsException("유효하지 않거나 만료된 리프레시 토큰입니다.");
+        }
+        if (!jwtUtil.isRefreshToken(claims)) {
+            throw new BadCredentialsException("리프레시 토큰이 아닙니다.");
+        }
+        Long userId = Long.parseLong(claims.get("userId", String.class));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadCredentialsException("존재하지 않는 사용자입니다."));
+        return issueTokens(user);
+    }
+
+    private AuthResponse issueTokens(User user) {
         String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getId(), user.getName(), user.getEmail(), user.getRole().name());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getEmail(), user.getRole().name());
+        return new AuthResponse(token, refreshToken, user.getId(), user.getName(), user.getEmail(), user.getRole().name());
     }
 }

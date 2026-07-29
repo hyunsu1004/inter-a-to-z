@@ -23,6 +23,7 @@ export function AuthProvider({ children }) {
 
   const persist = (data) => {
     localStorage.setItem('inter_a2z_token', data.token)
+    localStorage.setItem('inter_a2z_refresh_token', data.refreshToken)
     const userInfo = { userId: data.userId, name: data.name, email: data.email, role: data.role }
     localStorage.setItem('inter_a2z_user', JSON.stringify(userInfo))
     setUser(userInfo)
@@ -30,6 +31,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem('inter_a2z_token')
+    localStorage.removeItem('inter_a2z_refresh_token')
     localStorage.removeItem('inter_a2z_user')
     setUser(null)
   }, [])

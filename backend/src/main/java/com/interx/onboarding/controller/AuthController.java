@@ -2,6 +2,7 @@ package com.interx.onboarding.controller;
 
 import com.interx.onboarding.dto.AuthResponse;
 import com.interx.onboarding.dto.LoginRequest;
+import com.interx.onboarding.dto.RefreshRequest;
 import com.interx.onboarding.dto.SignupRequest;
 import com.interx.onboarding.service.AuthService;
 import jakarta.validation.Valid;
@@ -23,5 +24,10 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest req) {
         return authService.login(req);
+    }
+
+    @PostMapping("/refresh")
+    public AuthResponse refresh(@Valid @RequestBody RefreshRequest req) {
+        return authService.refresh(req);
     }
 }
